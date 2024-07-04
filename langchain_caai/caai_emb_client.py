@@ -7,10 +7,11 @@ import requests
 from typing import List
 from langchain_core.embeddings import Embeddings
 
+
 class caai_emb_client(Embeddings):
-    def __init__(self, api_key: str, api_url: str, model="", max_batch_size=10, num_workers=1, progress_bar=False):
+    def __init__(self, api_key: str, api_url: str, model="", max_batch_size=1, num_workers=1, progress_bar=False):
         self.api_key = 'Bearer ' + api_key
-        self.api_url = urljoin(os.path.join(api_url, ''),'embeddings')
+        self.api_url = urljoin(os.path.join(api_url, ''), 'embeddings')
         self.model = model
         self.max_batch_size = max_batch_size
         self.num_workers = num_workers
@@ -20,8 +21,6 @@ class caai_emb_client(Embeddings):
 
         response_list = []
 
-        #session = requests.Session()
-
         response = session.post(
             self.api_url,
             headers={'Authorization': self.api_key},
@@ -30,13 +29,13 @@ class caai_emb_client(Embeddings):
                 "input": request_list,
             },
         )
-        #print('response:', response.text)
+        # print('response:', response.text)
         response = response.json()
         if 'data' in response:
             for resp in response['data']:
                 if 'embedding' in resp:
                     emb = resp['embedding']
-                    #print('emb:', emb)
+                    # print('emb:', emb)
                     response_list.append(emb)
                 else:
                     print('why is embedding not in:', resp)
@@ -44,38 +43,9 @@ class caai_emb_client(Embeddings):
             print('WHY IS DATA NOT IN: ', response)
             print('request_list:', request_list)
 
-        #session.close()
-
         return response_list
-    def query_data_old(self, session, request_list, response_list):
-        #print('rl:', request_list)
-        response = session.post(
-            self.api_url,
-            headers={'Authorization': self.api_key},
-            json={
-                "model": self.model,
-                "input": request_list,
-            },
-        )
-        #print('response:', response.text)
-        response = response.json()
-        if 'data' in response:
-            for resp in response['data']:
-                if 'embedding' in resp:
-                    emb = resp['embedding']
-                    #print('emb:', emb)
-                    response_list.append(emb)
-                else:
-                    print('why is embedding not in:', resp)
-        else:
-            print('WHY IS DATA NOT IN: ', response)
-            print('request_list:', request_list)
-        request_list.clear()
-        return response_list
-
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-
         if self.progress_bar:
             progress_bar = tqdm(total=len(texts), unit="record", desc="Get embeddings")
 
@@ -84,27 +54,29 @@ class caai_emb_client(Embeddings):
 
         max_size = self.max_batch_size
         offset = 0
+        submitted_jobs = 0
         response_list = []
 
         session = requests.Session()
 
-        while len(texts) != len(response_list):
+        while len(texts) != submitted_jobs:
             remaining = len(texts) - len(response_list)
             if max_size > remaining:
                 max_size = remaining
 
             request_list = texts[offset:offset + max_size]
             offset += max_size
+            submitted_jobs += len(request_list)
 
             if self.progress_bar:
                 job = workers_pool.apply_async(self.query_data, args=(list(request_list), session, None),
-                                         callback=lambda arg: progress_bar.update(self.max_batch_size))
+                                               callback=lambda arg: progress_bar.update(self.max_batch_size))
             else:
                 job = workers_pool.apply_async(self.query_data, args=(list(request_list), session, None))
 
             jobs_list.append(job)
 
-            #response_list = self.query_data(request_list, response_list)
+            # response_list = self.query_data(request_list, response_list)
 
         workers_pool.close()
         workers_pool.join()
@@ -114,35 +86,10 @@ class caai_emb_client(Embeddings):
         if self.progress_bar:
             progress_bar.close()
 
-        print('job_list:', len(jobs_list))
         for proc in jobs_list:
             j = proc.get()
             for record in j:
                 response_list.append(record)
-
-        print('in:', len(texts))
-        print('out:', len(response_list))
-
-        return response_list
-
-    def embed_documents_old(self, texts: List[str]) -> List[List[float]]:
-
-        max_size = self.max_batch_size
-        offset = 0
-        response_list = []
-
-        session = requests.Session()
-
-        while len(texts) != len(response_list):
-            remaining = len(texts) - len(response_list)
-            if max_size > remaining:
-                max_size = remaining
-
-            request_list = texts[offset:offset + max_size]
-            offset += max_size
-            response_list = self.query_data(session, request_list, response_list)
-
-        session.close()
 
         return response_list
 

@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='langchain-caai',
-    version='0.4',
+    version='0.5',
     packages=['langchain_caai'],
     url='https://caai.ai.uky.edu',
     license='Apache 2.0',
@@ -10,6 +10,5 @@ setup(
     author_email='ai@uky.edu',
     description='Python Langchain CAAI Tools',
     install_requires=['langchain_core','tqdm'],
-
 )
 
